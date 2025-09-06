@@ -9,7 +9,7 @@ Type=simple
 User=oteldemo
 Group=oteldemo
 WorkingDirectory=/opt/oteldemo/load-generator
-ExecStart=/usr/bin/locust --web-host=0.0.0.0 --web-port=8089 --host=http://localhost:3000 --users=10 --spawn-rate=2
+ExecStart=/usr/bin/python3 /opt/oteldemo/load-generator/server.py
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

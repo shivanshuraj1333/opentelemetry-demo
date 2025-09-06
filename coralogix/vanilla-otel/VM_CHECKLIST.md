@@ -43,8 +43,8 @@ sudo ./test-vm.sh
 # Install everything
 sudo ./install.sh
 
-# Build services
-sudo ./build-services.sh
+# Setup demo services
+sudo ./setup-demo.sh
 
 # Start services
 sudo ./quick-start.sh start

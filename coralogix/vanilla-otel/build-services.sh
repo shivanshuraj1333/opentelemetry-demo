@@ -13,7 +13,18 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-DEMO_ROOT="/Users/shivanshu.shrivastava/coralogix/github/opentelemetry-demo"
+# Try to find the demo root directory
+if [ -d "/Users/shivanshu.shrivastava/coralogix/github/opentelemetry-demo" ]; then
+    DEMO_ROOT="/Users/shivanshu.shrivastava/coralogix/github/opentelemetry-demo"
+elif [ -d "../.." ] && [ -f "../../src/frontend/package.json" ]; then
+    DEMO_ROOT="$(realpath ../..)"
+elif [ -d ".." ] && [ -f "../src/frontend/package.json" ]; then
+    DEMO_ROOT="$(realpath ..)"
+else
+    DEMO_ROOT=""
+    log_warning "Could not find OpenTelemetry demo source directory. Some services may not build."
+fi
+
 SERVICE_DIR="/opt/oteldemo"
 SERVICE_USER="oteldemo"
 SERVICE_GROUP="oteldemo"
@@ -48,17 +59,33 @@ build_frontend() {
     # Create service directory
     mkdir -p "$SERVICE_DIR/frontend"
     
-    # Copy source files
-    cp -r "$DEMO_ROOT/src/frontend"/* "$SERVICE_DIR/frontend/"
-    
-    # Install dependencies
-    cd "$SERVICE_DIR/frontend"
-    npm install --production
-    
-    # Set ownership
-    chown -R "$SERVICE_USER:$SERVICE_GROUP" "$SERVICE_DIR/frontend"
-    
-    log_success "Frontend service built"
+    if [ -n "$DEMO_ROOT" ] && [ -d "$DEMO_ROOT/src/frontend" ]; then
+        # Copy source files
+        cp -r "$DEMO_ROOT/src/frontend"/* "$SERVICE_DIR/frontend/"
+        
+        # Install dependencies
+        cd "$SERVICE_DIR/frontend"
+        npm install --production
+        
+        # Set ownership
+        chown -R "$SERVICE_USER:$SERVICE_GROUP" "$SERVICE_DIR/frontend"
+        
+        log_success "Frontend service built successfully"
+    else
+        log_warning "Frontend source not found. Creating minimal placeholder."
+        # Create a minimal placeholder
+        cat > "$SERVICE_DIR/frontend/package.json" << 'EOF'
+{
+  "name": "frontend",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "echo 'Frontend service placeholder' && sleep infinity"
+  }
+}
+EOF
+        chown -R "$SERVICE_USER:$SERVICE_GROUP" "$SERVICE_DIR/frontend"
+        log_warning "Frontend placeholder created"
+    fi
 }
 
 build_cart() {

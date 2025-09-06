@@ -65,7 +65,7 @@ install_dependencies() {
             apt-get update
             apt-get install -y wget curl unzip systemd postgresql postgresql-contrib redis-server \
                 openjdk-11-jdk nodejs npm python3 python3-pip python3-venv \
-                dotnet-sdk-6.0 golang-go php-cli php-curl php-json \
+                dotnet-sdk-8.0 golang-go php-cli php-curl php-json \
                 build-essential cmake pkg-config libssl-dev \
                 default-jre
             ;;
@@ -324,8 +324,8 @@ show_next_steps() {
     log_success "Installation completed!"
     echo
     echo "Next steps:"
-    echo "1. Build the demo services:"
-    echo "   sudo ./build-services.sh"
+    echo "1. Setup the demo services:"
+    echo "   sudo ./setup-demo.sh"
     echo "2. Start infrastructure services:"
     echo "   sudo systemctl start postgresql redis-server otel-collector jaeger"
     echo "3. Start demo services:"
