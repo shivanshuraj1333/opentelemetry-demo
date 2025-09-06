@@ -99,10 +99,15 @@ cleanup_previous_installation() {
     groupdel zookeeper 2>/dev/null || true
     groupdel otelcol 2>/dev/null || true
     
-    # Clean up package cache
+    # Clean up package cache (skip if dpkg has issues)
     log_info "Cleaning package cache..."
-    apt-get clean
-    apt-get autoremove -y
+    if dpkg --configure -a 2>/dev/null; then
+        apt-get clean
+        apt-get autoremove -y
+        log_success "Package cache cleaned"
+    else
+        log_warning "Skipping package cleanup due to dpkg issues"
+    fi
     
     # Reload systemd
     systemctl daemon-reload
@@ -137,18 +142,30 @@ detect_os() {
 install_dependencies() {
     log_info "Installing dependencies..."
     
+    # Fix dpkg issues first
+    log_info "Checking and fixing dpkg issues..."
+    if ! dpkg --configure -a 2>/dev/null; then
+        log_warning "dpkg has issues, attempting to fix..."
+        apt-get update --fix-missing
+        apt-get install -f -y
+        dpkg --configure -a || log_warning "dpkg issues persist, continuing anyway"
+    fi
+    
     case $OS in
         "Ubuntu"|"Debian")
+            log_info "Updating package lists..."
             apt-get update
+            
+            log_info "Installing system packages..."
             apt-get install -y wget curl unzip systemd postgresql postgresql-contrib redis-server \
                 openjdk-11-jdk python3 python3-pip python3-venv \
                 dotnet-sdk-8.0 golang-go php-cli php-curl php-json \
                 build-essential cmake pkg-config libssl-dev \
-                default-jre
+                default-jre || log_error "Some packages failed to install"
             
-            # Install Node.js 20+ from NodeSource
+            log_info "Installing Node.js 20+ from NodeSource..."
             curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-            apt-get install -y nodejs
+            apt-get install -y nodejs || log_error "Node.js installation failed"
             ;;
         "CentOS"|"Red Hat Enterprise Linux"|"Rocky Linux"|"AlmaLinux")
             yum update -y
@@ -420,24 +437,77 @@ configure_services() {
 start_services() {
     log_info "Starting services..."
     
-    # Start infrastructure services
-    systemctl start postgresql
-    systemctl start redis-server
-    systemctl start otel-collector
-    systemctl start jaeger
-    systemctl start kafka
-    systemctl start zookeeper
+    # Start infrastructure services with error handling
+    log_info "Starting infrastructure services..."
+    systemctl start postgresql || log_warning "PostgreSQL failed to start"
+    sleep 2
+    systemctl start redis-server || log_warning "Redis failed to start"
+    sleep 2
+    systemctl start otel-collector || log_warning "OpenTelemetry Collector failed to start"
+    sleep 2
+    systemctl start jaeger || log_warning "Jaeger failed to start"
+    sleep 2
+    systemctl start kafka || log_warning "Kafka failed to start"
+    sleep 2
+    systemctl start zookeeper || log_warning "Zookeeper failed to start"
+    sleep 2
     
-    # Start demo services
-    systemctl start oteldemo-frontend
-    systemctl start oteldemo-cart
-    systemctl start oteldemo-checkout
-    systemctl start oteldemo-currency
-    systemctl start oteldemo-payment
-    systemctl start oteldemo-product-catalog
-    systemctl start oteldemo-load-generator
+    # Start demo services with error handling
+    log_info "Starting demo services..."
+    for service in oteldemo-frontend oteldemo-cart oteldemo-checkout oteldemo-currency oteldemo-payment oteldemo-product-catalog oteldemo-load-generator; do
+        systemctl start "$service" || log_warning "$service failed to start"
+        sleep 1
+    done
     
-    log_success "All services started"
+    log_success "Service startup completed"
+    log_info "Check service status with: sudo ./quick-start.sh status"
+}
+
+check_installation() {
+    log_info "Checking installation status..."
+    
+    # Check if key services are running
+    local failed_services=()
+    
+    if ! systemctl is-active --quiet postgresql; then
+        failed_services+=("postgresql")
+    fi
+    
+    if ! systemctl is-active --quiet redis-server; then
+        failed_services+=("redis-server")
+    fi
+    
+    if ! systemctl is-active --quiet otel-collector; then
+        failed_services+=("otel-collector")
+    fi
+    
+    if ! systemctl is-active --quiet jaeger; then
+        failed_services+=("jaeger")
+    fi
+    
+    if [ ${#failed_services[@]} -gt 0 ]; then
+        log_warning "Some infrastructure services failed to start: ${failed_services[*]}"
+        log_info "You can try to start them manually:"
+        for service in "${failed_services[@]}"; do
+            log_info "  sudo systemctl start $service"
+        done
+    else
+        log_success "All infrastructure services are running"
+    fi
+    
+    # Check demo services
+    local demo_failed=()
+    for service in oteldemo-frontend oteldemo-cart oteldemo-checkout oteldemo-currency oteldemo-payment oteldemo-product-catalog oteldemo-load-generator; do
+        if ! systemctl is-active --quiet "$service"; then
+            demo_failed+=("$service")
+        fi
+    done
+    
+    if [ ${#demo_failed[@]} -gt 0 ]; then
+        log_warning "Some demo services failed to start: ${demo_failed[*]}"
+    else
+        log_success "All demo services are running"
+    fi
 }
 
 enable_services() {
@@ -498,6 +568,7 @@ main() {
     enable_services
     setup_demo_services
     start_services
+    check_installation
     show_next_steps
 }
 
