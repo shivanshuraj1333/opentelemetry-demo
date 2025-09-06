@@ -1,50 +1,62 @@
-# OpenTelemetry Demo - Host Setup
+# OpenTelemetry Demo - Complete Setup
 
-Minimal setup to run OpenTelemetry demo services directly on Ubuntu as systemd services.
+## What This Does
+- **Infrastructure in Docker**: PostgreSQL, Kafka, Zookeeper, Jaeger, OpenTelemetry Collector, Prometheus, OpenSearch, Grafana, Flagd
+- **Demo Services as Systemd**: All 16 services from the original OpenTelemetry demo
+
+## Services Included
+**Infrastructure (Docker):**
+- PostgreSQL (5432), Kafka (9092), Zookeeper (2181)
+- Jaeger (16686), OpenTelemetry Collector (4317/4318)
+- Prometheus (9090), OpenSearch (9200), Grafana (3001)
+- Flagd (8013), Flagd UI (8080)
+
+**Demo Services (Systemd):**
+- accounting (8080), ad (8081), cart (8082), checkout (8083)
+- currency (8084), email (8085), fraud-detection (8086)
+- frontend (3000), frontend-proxy (8087), image-provider (8088)
+- load-generator (8089), payment (8090), product-catalog (8091)
+- quote (8092), recommendation (8093), shipping (8094)
 
 ## Quick Start
-
 ```bash
-# Install everything
+# Copy to VM
+scp -r . user@your-vm:/opt/otel-demo/
+
+# SSH and install
+ssh user@your-vm
+cd /opt/otel-demo
 sudo ./install.sh
-
-# Build services
-sudo ./build-services.sh
-
-# Start all services
-sudo ./quick-start.sh start
-
-# Check status
-sudo ./quick-start.sh status
 ```
 
-## Access URLs
-
+## Access
 - **Frontend**: http://localhost:3000
 - **Jaeger UI**: http://localhost:16686
-- **Load Generator**: http://localhost:8089
+- **Grafana**: http://localhost:3001 (admin/admin)
+- **Prometheus**: http://localhost:9090
+- **Flagd UI**: http://localhost:8080
 
-## Service Management
-
+## Management
 ```bash
-# Start/stop all
-sudo ./quick-start.sh start|stop|restart
+# Infrastructure
+docker compose up|down|ps
 
-# Individual services
-sudo systemctl start|stop|restart oteldemo-frontend
-sudo systemctl start|stop|restart otel-collector
+# Demo services
+systemctl start|stop|status oteldemo-*
 
-# View logs
-sudo journalctl -u otel-collector -f
-sudo journalctl -u oteldemo-frontend -f
+# Check all services
+systemctl status oteldemo-*
 ```
 
-## Testing
+## Files
+- `docker-compose.yml` - Infrastructure services
+- `otel-collector.yaml` - OpenTelemetry configuration
+- `install.sh` - Main installation script
+- `create-services.sh` - Creates demo service code
+- `create-systemd.sh` - Creates systemd service files
+- `init.sql` - Database initialization
+- `prometheus-config.yaml` - Prometheus configuration
+- `flagd/demo.flagd.json` - Feature flags
+- `grafana/datasources.yaml` - Grafana data sources
 
-```bash
-# Test on VM
-sudo ./test-vm.sh
-
-# Local validation
-make test-all
-```
+Complete OpenTelemetry demo with all services running as systemd processes.
