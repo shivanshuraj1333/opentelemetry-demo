@@ -67,7 +67,7 @@ install_dependencies() {
                 openjdk-11-jdk nodejs npm python3 python3-pip python3-venv \
                 dotnet-sdk-6.0 golang-go php-cli php-curl php-json \
                 build-essential cmake pkg-config libssl-dev \
-                confluent-kafka confluent-zookeeper
+                default-jre
             ;;
         "CentOS"|"Red Hat Enterprise Linux"|"Rocky Linux"|"AlmaLinux")
             yum update -y
@@ -157,6 +157,49 @@ download_jaeger() {
     rm -rf /tmp/jaeger.tar.gz /tmp/jaeger-${JAEGER_VERSION}-${ARCH}
 }
 
+download_kafka() {
+    log_info "Downloading Apache Kafka..."
+    
+    # Detect architecture
+    ARCH=$(uname -m)
+    case $ARCH in
+        x86_64)
+            ARCH=""
+            ;;
+        aarch64|arm64)
+            ARCH="-aarch64"
+            ;;
+        *)
+            log_error "Unsupported architecture: $ARCH"
+            exit 1
+            ;;
+    esac
+    
+    # Download Kafka
+    KAFKA_VERSION="2.13-3.6.1"
+    DOWNLOAD_URL="https://downloads.apache.org/kafka/3.6.1/kafka_${KAFKA_VERSION}.tgz"
+    
+    log_info "Downloading from: $DOWNLOAD_URL"
+    wget -O /tmp/kafka.tgz "$DOWNLOAD_URL"
+    
+    # Extract and install
+    tar -xzf /tmp/kafka.tgz -C /opt/
+    mv /opt/kafka_${KAFKA_VERSION} /opt/kafka
+    
+    # Create symlinks
+    ln -sf /opt/kafka/bin/kafka-server-start.sh /usr/local/bin/kafka-server-start
+    ln -sf /opt/kafka/bin/kafka-topics.sh /usr/local/bin/kafka-topics
+    ln -sf /opt/kafka/bin/zookeeper-server-start.sh /usr/local/bin/zookeeper-server-start
+    
+    # Set ownership
+    chown -R kafka:kafka /opt/kafka 2>/dev/null || true
+    
+    # Cleanup
+    rm -f /tmp/kafka.tgz
+    
+    log_success "Kafka installed to /opt/kafka"
+}
+
 create_users() {
     log_info "Creating service users and groups..."
     
@@ -183,6 +226,22 @@ create_users() {
     else
         log_info "User jaeger already exists"
     fi
+    
+    # Create kafka user
+    if ! id "kafka" &>/dev/null; then
+        useradd --system --no-create-home --shell /bin/false "kafka"
+        log_success "Created user: kafka"
+    else
+        log_info "User kafka already exists"
+    fi
+    
+    # Create zookeeper user
+    if ! id "zookeeper" &>/dev/null; then
+        useradd --system --no-create-home --shell /bin/false "zookeeper"
+        log_success "Created user: zookeeper"
+    else
+        log_info "User zookeeper already exists"
+    fi
 }
 
 create_directories() {
@@ -192,12 +251,14 @@ create_directories() {
     mkdir -p "$CONFIG_DIR"
     mkdir -p "$DATA_DIR"
     mkdir -p "/var/lib/jaeger"
+    mkdir -p "/var/lib/kafka-logs"
     mkdir -p "/opt/oteldemo"
     
     # Set ownership
     chown -R "$OTEL_USER:$OTEL_GROUP" "$CONFIG_DIR"
     chown -R "$OTEL_USER:$OTEL_GROUP" "$DATA_DIR"
     chown -R "jaeger:jaeger" "/var/lib/jaeger"
+    chown -R "kafka:kafka" "/var/lib/kafka-logs"
     chown -R "$SERVICE_USER:$SERVICE_GROUP" "/opt/oteldemo"
     
     log_success "Created directories"
@@ -291,6 +352,7 @@ main() {
     install_dependencies
     download_otelcol
     download_jaeger
+    download_kafka
     create_users
     create_directories
     install_configs
