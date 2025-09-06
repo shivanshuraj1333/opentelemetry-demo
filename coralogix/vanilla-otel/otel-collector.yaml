@@ -18,8 +18,6 @@ receivers:
   nginx:
     endpoint: http://localhost:8080/status
     collection_interval: 10s
-  docker_stats:
-    endpoint: unix:///var/run/docker.sock
   postgresql:
     endpoint: "localhost:5432"
     username: "root"
@@ -64,9 +62,6 @@ receivers:
             - /dev/*
             - /proc/*
             - /sys/*
-            - /run/k3s/containerd/*
-            - /var/lib/docker/*
-            - /var/lib/kubelet/*
             - /snap/*
           match_type: regexp
         exclude_fs_types:
@@ -165,7 +160,7 @@ service:
       processors: [resourcedetection, memory_limiter, transform, batch]
       exporters: [jaeger, debug, spanmetrics]
     metrics:
-      receivers: [docker_stats, httpcheck/frontend-proxy, hostmetrics, nginx, otlp, postgresql, redis, spanmetrics]
+      receivers: [httpcheck/frontend-proxy, hostmetrics, nginx, otlp, postgresql, redis, spanmetrics]
       processors: [resourcedetection, memory_limiter, batch]
       exporters: [otlphttp/prometheus, debug]
     logs:

@@ -114,14 +114,6 @@ start-loadgen:
 	@echo "Starting load generator..."
 	sudo systemctl start oteldemo-load-generator
 
-# Docker infrastructure (alternative)
-start-docker-infra:
-	@echo "Starting infrastructure services with Docker..."
-	docker-compose -f docker-compose-infrastructure.yml up -d
-
-stop-docker-infra:
-	@echo "Stopping Docker infrastructure services..."
-	docker-compose -f docker-compose-infrastructure.yml down
 
 # Cleanup
 clean:
