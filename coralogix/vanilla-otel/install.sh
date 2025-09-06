@@ -64,10 +64,14 @@ install_dependencies() {
         "Ubuntu"|"Debian")
             apt-get update
             apt-get install -y wget curl unzip systemd postgresql postgresql-contrib redis-server \
-                openjdk-11-jdk nodejs npm python3 python3-pip python3-venv \
+                openjdk-11-jdk python3 python3-pip python3-venv \
                 dotnet-sdk-8.0 golang-go php-cli php-curl php-json \
                 build-essential cmake pkg-config libssl-dev \
                 default-jre
+            
+            # Install Node.js 20+ from NodeSource
+            curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+            apt-get install -y nodejs
             ;;
         "CentOS"|"Red Hat Enterprise Linux"|"Rocky Linux"|"AlmaLinux")
             yum update -y
@@ -305,6 +309,60 @@ setup_database() {
     log_success "Database setup completed"
 }
 
+setup_demo_services() {
+    log_info "Setting up demo services..."
+    
+    # Run the setup-demo.sh script
+    if [ -f "./setup-demo.sh" ]; then
+        chmod +x ./setup-demo.sh
+        ./setup-demo.sh
+        log_success "Demo services setup completed"
+    else
+        log_warning "setup-demo.sh not found, skipping demo services setup"
+    fi
+}
+
+configure_services() {
+    log_info "Configuring services..."
+    
+    # Configure Redis
+    if [ -f "/etc/redis/redis.conf" ]; then
+        sed -i 's/^# bind 127.0.0.1/bind 127.0.0.1/' /etc/redis/redis.conf
+        sed -i 's/^# requirepass foobared/requirepass otel/' /etc/redis/redis.conf
+        log_success "Redis configured"
+    fi
+    
+    # Configure PostgreSQL
+    if [ -f "/etc/postgresql/*/main/postgresql.conf" ]; then
+        # Enable connections
+        echo "host all all 0.0.0.0/0 md5" >> /etc/postgresql/*/main/pg_hba.conf
+        log_success "PostgreSQL configured"
+    fi
+}
+
+start_services() {
+    log_info "Starting services..."
+    
+    # Start infrastructure services
+    systemctl start postgresql
+    systemctl start redis-server
+    systemctl start otel-collector
+    systemctl start jaeger
+    systemctl start kafka
+    systemctl start zookeeper
+    
+    # Start demo services
+    systemctl start oteldemo-frontend
+    systemctl start oteldemo-cart
+    systemctl start oteldemo-checkout
+    systemctl start oteldemo-currency
+    systemctl start oteldemo-payment
+    systemctl start oteldemo-product-catalog
+    systemctl start oteldemo-load-generator
+    
+    log_success "All services started"
+}
+
 enable_services() {
     log_info "Enabling services..."
     
@@ -358,7 +416,10 @@ main() {
     install_configs
     install_systemd_services
     setup_database
+    configure_services
     enable_services
+    setup_demo_services
+    start_services
     show_next_steps
 }
 
