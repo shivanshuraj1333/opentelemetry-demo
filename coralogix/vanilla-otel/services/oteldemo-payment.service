@@ -1,0 +1,31 @@
+[Unit]
+Description=OpenTelemetry Demo - Payment Service
+After=network.target otel-collector.service
+Wants=network.target
+Requires=otel-collector.service
+
+[Service]
+Type=simple
+User=oteldemo
+Group=oteldemo
+WorkingDirectory=/opt/oteldemo/payment
+ExecStart=/usr/bin/node index.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=oteldemo-payment
+
+# Environment
+Environment=PAYMENT_PORT=8085
+Environment=OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+Environment=OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta
+Environment=OTEL_RESOURCE_ATTRIBUTES=service.name=payment,service.version=1.0.0,deployment.environment=host
+Environment=OTEL_SERVICE_NAME=payment
+
+# Resource limits
+MemoryMax=128M
+CPUQuota=20%
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,32 @@
+[Unit]
+Description=OpenTelemetry Demo - Product Catalog Service
+After=network.target coralogix-collector.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=oteldemo
+Group=oteldemo
+WorkingDirectory=/opt/oteldemo/product-catalog
+ExecStart=/usr/local/bin/product-catalog
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=oteldemo-product-catalog
+
+# Environment
+Environment=PRODUCT_CATALOG_PORT=8084
+Environment=PRODUCT_CATALOG_RELOAD_INTERVAL=0
+Environment=GOMEMLIMIT=16MiB
+Environment=OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+Environment=OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta
+Environment=OTEL_SERVICE_NAME=product-catalog
+Environment=OTEL_RESOURCE_ATTRIBUTES=service.name=product-catalog,service.version=1.0.0,deployment.environment=host
+
+# Resource limits
+MemoryMax=64M
+CPUQuota=20%
+
+[Install]
+WantedBy=multi-user.target

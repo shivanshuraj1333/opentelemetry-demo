@@ -1,0 +1,395 @@
+# OpenTelemetry Demo - Host Deployment
+# This configuration runs the OpenTelemetry demo services directly on the host
+# with Coralogix agent and collector for observability
+
+version: '3.8'
+
+x-default-logging: &logging
+  driver: "json-file"
+  options:
+    max-size: "5m"
+    max-file: "2"
+    tag: "{{.Name}}"
+
+networks:
+  default:
+    name: opentelemetry-demo-host
+    driver: bridge
+
+services:
+  # ******************
+  # Infrastructure Services
+  # ******************
+  
+  # PostgreSQL
+  postgresql:
+    image: postgres:15
+    container_name: oteldemo-postgresql
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: otel
+      POSTGRES_DB: otel
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    logging: *logging
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: oteldemo-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    logging: *logging
+
+  # Kafka
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: oteldemo-kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    depends_on:
+      - zookeeper
+    logging: *logging
+
+  # Zookeeper
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: oteldemo-zookeeper
+    restart: unless-stopped
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    logging: *logging
+
+  # ******************
+  # Core Demo Services
+  # ******************
+  
+  # Frontend
+  frontend:
+    image: ${IMAGE_NAME}:${DEMO_VERSION}-frontend
+    container_name: oteldemo-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - FRONTEND_ADDR=http://localhost:3000
+      - AD_ADDR=http://ad:8080
+      - CART_ADDR=http://cart:8080
+      - CHECKOUT_ADDR=http://checkout:8080
+      - CURRENCY_ADDR=http://currency:8080
+      - PRODUCT_CATALOG_ADDR=http://product-catalog:8080
+      - RECOMMENDATION_ADDR=http://recommendation:8080
+      - SHIPPING_ADDR=http://shipping:8080
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://coralogix-collector:4318
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=frontend,service.version=1.0.0,deployment.environment=host
+      - OTEL_SERVICE_NAME=frontend
+      - PUBLIC_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://coralogix-collector:4318/v1/traces
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta
+      - WEB_OTEL_SERVICE_NAME=frontend-web
+    depends_on:
+      - coralogix-collector
+      - ad
+      - cart
+      - checkout
+      - currency
+      - product-catalog
+      - quote
+      - recommendation
+      - shipping
+    logging: *logging
+
+  # Ad Service
+  ad:
+    image: ${IMAGE_NAME}:${DEMO_VERSION}-ad
+    container_name: oteldemo-ad
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - AD_PORT=8080
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://coralogix-collector:4318
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=ad,service.version=1.0.0,deployment.environment=host
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_SERVICE_NAME=ad
+    depends_on:
+      - coralogix-collector
+    logging: *logging
+
+  # Cart Service
+  cart:
+    image: ${IMAGE_NAME}:${DEMO_VERSION}-cart
+    container_name: oteldemo-cart
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      - CART_PORT=8080
+      - VALKEY_ADDR=redis:6379
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://coralogix-collector:4318
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=cart,service.version=1.0.0,deployment.environment=host
+      - OTEL_SERVICE_NAME=cart
+      - ASPNETCORE_URLS=http://*:8080
+    depends_on:
+      - redis
+      - coralogix-collector
+    logging: *logging
+
+  # Checkout Service
+  checkout:
+    image: ${IMAGE_NAME}:${DEMO_VERSION}-checkout
+    container_name: oteldemo-checkout
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    environment:
+      - CHECKOUT_PORT=8080
+      - CART_ADDR=http://cart:8080
+      - CURRENCY_ADDR=http://currency:8080
+      - EMAIL_ADDR=http://email:8080
+      - PAYMENT_ADDR=http://payment:8080
+      - PRODUCT_CATALOG_ADDR=http://product-catalog:8080
+      - SHIPPING_ADDR=http://shipping:8080
+      - KAFKA_ADDR=kafka:9092
+      - GOMEMLIMIT=16MiB
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://coralogix-collector:4318
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=checkout,service.version=1.0.0,deployment.environment=host
+      - OTEL_SERVICE_NAME=checkout
+    depends_on:
+      - cart
+      - currency
+      - email
+      - payment
+      - product-catalog
+      - shipping
+      - coralogix-collector
+      - kafka
+    logging: *logging
+
+  # Currency Service
+  currency:
+    image: ${IMAGE_NAME}:${DEMO_VERSION}-currency
+    container_name: oteldemo-currency
+    restart: unless-stopped
+    ports:
+      - "8083:8080"
+    environment:
+      - CURRENCY_PORT=8080
+      - VERSION=${IMAGE_VERSION}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://coralogix-collector:4318
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=currency,service.version=1.0.0,deployment.environment=host
+    depends_on:
+      - coralogix-collector
+    logging: *logging
+
+  # Email Service
+  email:
+    image: ${IMAGE_NAME}:${DEMO_VERSION}-email
+    container_name: oteldemo-email
+    restart: unless-stopped
+    ports:
+      - "8084:8080"
+    environment:
+      - APP_ENV=production
+      - EMAIL_PORT=8080
+      - OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://coralogix-collector:4318/v1/traces
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=email,service.version=1.0.0,deployment.environment=host
+      - OTEL_SERVICE_NAME=email
+    depends_on:
+      - coralogix-collector
+    logging: *logging
+
+  # Payment Service
+  payment:
+    image: ${IMAGE_NAME}:${DEMO_VERSION}-payment
+    container_name: oteldemo-payment
+    restart: unless-stopped
+    ports:
+      - "8085:8080"
+    environment:
+      - PAYMENT_PORT=8080
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://coralogix-collector:4318
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=payment,service.version=1.0.0,deployment.environment=host
+      - OTEL_SERVICE_NAME=payment
+    depends_on:
+      - coralogix-collector
+    logging: *logging
+
+  # Product Catalog Service
+  product-catalog:
+    image: ${IMAGE_NAME}:${DEMO_VERSION}-product-catalog
+    container_name: oteldemo-product-catalog
+    restart: unless-stopped
+    ports:
+      - "8086:8080"
+    environment:
+      - PRODUCT_CATALOG_PORT=8080
+      - PRODUCT_CATALOG_RELOAD_INTERVAL=0
+      - GOMEMLIMIT=16MiB
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://coralogix-collector:4318
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=product-catalog,service.version=1.0.0,deployment.environment=host
+      - OTEL_SERVICE_NAME=product-catalog
+    volumes:
+      - ./src/product-catalog/products:/usr/src/app/products
+    depends_on:
+      - coralogix-collector
+    logging: *logging
+
+  # Quote Service
+  quote:
+    image: ${IMAGE_NAME}:${DEMO_VERSION}-quote
+    container_name: oteldemo-quote
+    restart: unless-stopped
+    ports:
+      - "8087:8080"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://coralogix-collector:4318
+      - OTEL_PHP_AUTOLOAD_ENABLED=true
+      - QUOTE_PORT=8080
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=quote,service.version=1.0.0,deployment.environment=host
+      - OTEL_SERVICE_NAME=quote
+      - OTEL_PHP_INTERNAL_METRICS_ENABLED=true
+    depends_on:
+      - coralogix-collector
+    logging: *logging
+
+  # Recommendation Service
+  recommendation:
+    image: ${IMAGE_NAME}:${DEMO_VERSION}-recommendation
+    container_name: oteldemo-recommendation
+    restart: unless-stopped
+    ports:
+      - "8088:8080"
+    environment:
+      - RECOMMENDATION_PORT=8080
+      - PRODUCT_CATALOG_ADDR=http://product-catalog:8080
+      - OTEL_PYTHON_LOG_CORRELATION=true
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://coralogix-collector:4318
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=recommendation,service.version=1.0.0,deployment.environment=host
+      - OTEL_SERVICE_NAME=recommendation
+      - PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+    depends_on:
+      - product-catalog
+      - coralogix-collector
+    logging: *logging
+
+  # Shipping Service
+  shipping:
+    image: ${IMAGE_NAME}:${DEMO_VERSION}-shipping
+    container_name: oteldemo-shipping
+    restart: unless-stopped
+    ports:
+      - "8089:8080"
+    environment:
+      - SHIPPING_PORT=8080
+      - QUOTE_ADDR=http://quote:8080
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://coralogix-collector:4318
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=shipping,service.version=1.0.0,deployment.environment=host
+      - OTEL_SERVICE_NAME=shipping
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 1 bash -c '>/dev/tcp/localhost/8080'"]
+      start_period: 10s
+      interval: 5s
+      timeout: 10s
+      retries: 10
+    depends_on:
+      - coralogix-collector
+    logging: *logging
+
+  # Load Generator
+  load-generator:
+    image: ${IMAGE_NAME}:${DEMO_VERSION}-load-generator
+    container_name: oteldemo-load-generator
+    restart: unless-stopped
+    ports:
+      - "8089:8089"
+    environment:
+      - LOCUST_WEB_PORT=8089
+      - LOCUST_USERS=10
+      - LOCUST_HOST=http://frontend:3000
+      - LOCUST_HEADLESS=false
+      - LOCUST_AUTOSTART=true
+      - LOCUST_BROWSER_TRAFFIC_ENABLED=true
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://coralogix-collector:4318
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta
+      - OTEL_RESOURCE_ATTRIBUTES=service.name=load-generator,service.version=1.0.0,deployment.environment=host
+      - OTEL_SERVICE_NAME=load-generator
+      - PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+      - LOCUST_WEB_HOST=0.0.0.0
+    depends_on:
+      - frontend
+      - coralogix-collector
+    logging: *logging
+
+  # ******************
+  # Coralogix Services
+  # ******************
+  
+  # Coralogix Agent (runs on host, not in container)
+  # This service definition is for reference only
+  # The actual agent runs as a systemd service on the host
+  coralogix-agent:
+    image: otel/opentelemetry-collector-contrib:${OTELCOL_CONTRIB_VERSION}
+    container_name: coralogix-agent
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/agent.yaml"]
+    volumes:
+      - /etc/otelcol:/etc/otelcol:ro
+      - /var/lib/otelcol:/var/lib/otelcol
+      - /var/log:/var/log:ro
+      - /hostfs:/hostfs:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "14250:14250" # Jaeger gRPC
+      - "14268:14268" # Jaeger HTTP
+      - "6831:6831"   # Jaeger thrift compact
+      - "6832:6832"   # Jaeger thrift binary
+      - "9411:9411"   # Zipkin
+      - "8125:8125"   # StatsD
+      - "8888:8888"   # Prometheus metrics
+      - "13133:13133" # Health check
+    environment:
+      - CORALOGIX_PRIVATE_KEY=${CORALOGIX_PRIVATE_KEY}
+    logging: *logging
+
+  # Coralogix Collector
+  coralogix-collector:
+    image: otel/opentelemetry-collector-contrib:${OTELCOL_CONTRIB_VERSION}
+    container_name: coralogix-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/collector.yaml"]
+    volumes:
+      - /etc/otelcol:/etc/otelcol:ro
+      - /var/lib/otelcol:/var/lib/otelcol
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8888:8888"   # Prometheus metrics
+      - "13133:13133" # Health check
+    environment:
+      - CORALOGIX_PRIVATE_KEY=${CORALOGIX_PRIVATE_KEY}
+    logging: *logging
+
+volumes:
+  postgres_data:

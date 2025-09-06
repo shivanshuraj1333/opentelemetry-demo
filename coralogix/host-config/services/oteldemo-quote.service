@@ -1,0 +1,31 @@
+[Unit]
+Description=OpenTelemetry Demo - Quote Service
+After=network.target coralogix-collector.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=oteldemo
+Group=oteldemo
+WorkingDirectory=/opt/oteldemo/quote
+ExecStart=/usr/bin/php -S 0.0.0.0:8089 public/index.php
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=oteldemo-quote
+
+# Environment
+Environment=OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+Environment=OTEL_PHP_AUTOLOAD_ENABLED=true
+Environment=QUOTE_PORT=8089
+Environment=OTEL_SERVICE_NAME=quote
+Environment=OTEL_RESOURCE_ATTRIBUTES=service.name=quote,service.version=1.0.0,deployment.environment=host
+Environment=OTEL_PHP_INTERNAL_METRICS_ENABLED=true
+
+# Resource limits
+MemoryMax=64M
+CPUQuota=20%
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,22 @@
+[Unit]
+Description=Redis for OpenTelemetry Demo
+After=network.target
+Wants=network.target
+
+[Service]
+Type=notify
+User=redis
+Group=redis
+ExecStart=/usr/bin/redis-server /etc/redis/redis.conf
+ExecStop=/bin/kill -s QUIT $MAINPID
+TimeoutStopSec=0
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=redis
+
+# Resource limits
+MemoryMax=64M
+CPUQuota=20%
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,28 @@
+[Unit]
+Description=Apache Kafka for OpenTelemetry Demo
+After=network.target zookeeper.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=kafka
+Group=kafka
+ExecStart=/opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kafka
+
+# Environment
+Environment=KAFKA_ZOOKEEPER_CONNECT=localhost:2181
+Environment=KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
+Environment=KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+Environment=KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+
+# Resource limits
+MemoryMax=512M
+CPUQuota=40%
+
+[Install]
+WantedBy=multi-user.target

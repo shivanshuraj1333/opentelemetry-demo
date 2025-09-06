@@ -1,0 +1,36 @@
+[Unit]
+Description=OpenTelemetry Collector
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=otelcol
+Group=otelcol
+ExecStart=/usr/local/bin/otelcol-contrib --config=/etc/otelcol/otel-collector.yaml
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=otel-collector
+WorkingDirectory=/var/lib/otelcol
+
+# Environment
+Environment=OTEL_COLLECTOR_HOST=localhost
+Environment=OTEL_COLLECTOR_PORT_GRPC=4317
+Environment=OTEL_COLLECTOR_PORT_HTTP=4318
+
+# Resource limits
+MemoryMax=1G
+CPUQuota=50%
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/otelcol
+
+[Install]
+WantedBy=multi-user.target

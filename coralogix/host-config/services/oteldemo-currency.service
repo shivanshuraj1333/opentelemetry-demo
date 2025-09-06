@@ -1,0 +1,29 @@
+[Unit]
+Description=OpenTelemetry Demo - Currency Service
+After=network.target coralogix-collector.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=oteldemo
+Group=oteldemo
+WorkingDirectory=/opt/oteldemo/currency
+ExecStart=/usr/local/bin/currency
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=oteldemo-currency
+
+# Environment
+Environment=CURRENCY_PORT=8083
+Environment=VERSION=1.0.0
+Environment=OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+Environment=OTEL_RESOURCE_ATTRIBUTES=service.name=currency,service.version=1.0.0,deployment.environment=host
+
+# Resource limits
+MemoryMax=64M
+CPUQuota=20%
+
+[Install]
+WantedBy=multi-user.target

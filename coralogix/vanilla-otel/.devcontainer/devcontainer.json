@@ -1,0 +1,52 @@
+{
+  "name": "OpenTelemetry Demo - Vanilla Host Development",
+  "image": "ubuntu:22.04",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "18"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    },
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.21"
+    },
+    "ghcr.io/devcontainers/features/dotnet:1": {
+      "version": "6.0"
+    },
+    "ghcr.io/devcontainers/features/rust:1": {
+      "version": "1.70"
+    },
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "11"
+    },
+    "ghcr.io/devcontainers/features/php:1": {
+      "version": "8.1"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.vscode-yaml",
+        "redhat.vscode-yaml",
+        "ms-vscode.makefile-tools",
+        "ms-python.python",
+        "golang.go",
+        "ms-dotnettools.csharp",
+        "rust-lang.rust-analyzer"
+      ]
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/setup-devcontainer.sh",
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached"
+  ],
+  "workspaceFolder": "/workspace",
+  "remoteUser": "vscode",
+  "privileged": true,
+  "runArgs": [
+    "--cap-add=SYS_PTRACE",
+    "--security-opt", "seccomp=unconfined"
+  ]
+}

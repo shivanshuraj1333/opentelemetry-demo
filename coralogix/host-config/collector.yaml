@@ -1,0 +1,307 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  opamp:
+    agent_description:
+      include_resource_attributes: true
+      non_identifying_attributes:
+        cx.agent.type: cluster-collector
+        cx.cluster.name: 'host-demo'
+        cx.deployment.type: 'host'
+    server:
+      http:
+        endpoint: https://ingress.app.staging.coralogix.net/opamp/v1
+        headers:
+          Authorization: Bearer ${env:CORALOGIX_PRIVATE_KEY}
+        polling_interval: 2m
+  pprof:
+    endpoint: localhost:1777
+  zpages:
+    endpoint: localhost:55679
+
+processors:
+  batch:
+    send_batch_max_size: 2048
+    send_batch_size: 1024
+    timeout: 1s
+  memory_limiter:
+    check_interval: 5s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+  resource/metadata:
+    attributes:
+    - action: upsert
+      key: cx.agent.type
+      value: cluster-collector
+    - action: upsert
+      key: cx.otel_integration.name
+      value: coralogix-integration-host
+    - action: upsert
+      key: cx.deployment.type
+      value: host
+  resourcedetection/env:
+    detectors:
+    - system
+    - env
+    override: false
+    system:
+      resource_attributes:
+        host.id:
+          enabled: true
+    timeout: 2s
+  resourcedetection/region:
+    detectors:
+    - gcp
+    - ec2
+    - azure
+    override: true
+    timeout: 2s
+  transform/reduce:
+    error_mode: silent
+    log_statements:
+    - context: resource
+      statements:
+      - delete_key(attributes, "azure.resourcegroup.name")
+      - delete_key(attributes, "azure.vm.name")
+      - delete_key(attributes, "azure.vm.scaleset.name")
+      - delete_key(attributes, "azure.vm.size")
+      - delete_key(attributes, "cloud.account.id")
+      - delete_key(attributes, "cloud.availability_zone")
+      - delete_key(attributes, "cloud.platform")
+      - delete_key(attributes, "cloud.provider")
+      - delete_key(attributes, "cloud.region")
+      - delete_key(attributes, "container.id")
+      - delete_key(attributes, "cx.otel_integration.name")
+      - delete_key(attributes, "faas.id")
+      - delete_key(attributes, "faas.instance")
+      - delete_key(attributes, "faas.name")
+      - delete_key(attributes, "faas.version")
+      - delete_key(attributes, "gcp.cloud_run.job.execution")
+      - delete_key(attributes, "gcp.cloud_run.job.task_index")
+      - delete_key(attributes, "gcp.gce.instance_group_manager.name")
+      - delete_key(attributes, "gcp.gce.instance_group_manager.region")
+      - delete_key(attributes, "gcp.gce.instance_group_manager.zone")
+      - delete_key(attributes, "host.image.id")
+      - delete_key(attributes, "host.type")
+      - delete_key(attributes, "os.type")
+      - delete_key(attributes, "os.version")
+      - delete_key(attributes, "process.command")
+      - delete_key(attributes, "process.command_line")
+      - delete_key(attributes, "process.command_args")
+      - delete_key(attributes, "process.executable.name")
+      - delete_key(attributes, "process.executable.path")
+      - delete_key(attributes, "process.owner")
+      - delete_key(attributes, "process.pid")
+      - delete_key(attributes, "process.parent_pid")
+      - delete_key(attributes, "process.runtime.description")
+      - delete_key(attributes, "process.runtime.name")
+      - delete_key(attributes, "process.runtime.version")
+      - delete_key(attributes, "telemetry.distro.name")
+      - delete_key(attributes, "telemetry.distro.version")
+      - delete_key(attributes, "telemetry.sdk.language")
+      - delete_key(attributes, "telemetry.sdk.name")
+      - delete_key(attributes, "telemetry.sdk.version")
+    metric_statements:
+    - context: resource
+      statements:
+      - delete_key(attributes, "azure.resourcegroup.name")
+      - delete_key(attributes, "azure.vm.name")
+      - delete_key(attributes, "azure.vm.scaleset.name")
+      - delete_key(attributes, "azure.vm.size")
+      - delete_key(attributes, "cloud.account.id")
+      - delete_key(attributes, "cloud.availability_zone")
+      - delete_key(attributes, "cloud.platform")
+      - delete_key(attributes, "cloud.provider")
+      - delete_key(attributes, "cloud.region")
+      - delete_key(attributes, "container.id")
+      - delete_key(attributes, "cx.otel_integration.name")
+      - delete_key(attributes, "faas.id")
+      - delete_key(attributes, "faas.instance")
+      - delete_key(attributes, "faas.name")
+      - delete_key(attributes, "faas.version")
+      - delete_key(attributes, "gcp.cloud_run.job.execution")
+      - delete_key(attributes, "gcp.cloud_run.job.task_index")
+      - delete_key(attributes, "gcp.gce.instance_group_manager.name")
+      - delete_key(attributes, "gcp.gce.instance_group_manager.region")
+      - delete_key(attributes, "gcp.gce.instance_group_manager.zone")
+      - delete_key(attributes, "host.image.id")
+      - delete_key(attributes, "host.type")
+      - delete_key(attributes, "os.type")
+      - delete_key(attributes, "os.version")
+      - delete_key(attributes, "process.command")
+      - delete_key(attributes, "process.command_line")
+      - delete_key(attributes, "process.command_args")
+      - delete_key(attributes, "process.executable.name")
+      - delete_key(attributes, "process.executable.path")
+      - delete_key(attributes, "process.owner")
+      - delete_key(attributes, "process.pid")
+      - delete_key(attributes, "process.parent_pid")
+      - delete_key(attributes, "process.runtime.description")
+      - delete_key(attributes, "process.runtime.name")
+      - delete_key(attributes, "process.runtime.version")
+      - delete_key(attributes, "net.host.name")
+      - delete_key(attributes, "net.host.port")
+      - delete_key(attributes, "telemetry.distro.name")
+      - delete_key(attributes, "telemetry.distro.version")
+      - delete_key(attributes, "telemetry.sdk.language")
+      - delete_key(attributes, "telemetry.sdk.name")
+      - delete_key(attributes, "telemetry.sdk.version")
+    trace_statements:
+    - context: resource
+      statements:
+      - delete_key(attributes, "azure.resourcegroup.name")
+      - delete_key(attributes, "azure.vm.name")
+      - delete_key(attributes, "azure.vm.scaleset.name")
+      - delete_key(attributes, "azure.vm.size")
+      - delete_key(attributes, "cloud.account.id")
+      - delete_key(attributes, "cloud.availability_zone")
+      - delete_key(attributes, "cloud.platform")
+      - delete_key(attributes, "cloud.provider")
+      - delete_key(attributes, "cloud.region")
+      - delete_key(attributes, "container.id")
+      - delete_key(attributes, "cx.otel_integration.name")
+      - delete_key(attributes, "faas.id")
+      - delete_key(attributes, "faas.instance")
+      - delete_key(attributes, "faas.name")
+      - delete_key(attributes, "faas.version")
+      - delete_key(attributes, "gcp.cloud_run.job.execution")
+      - delete_key(attributes, "gcp.cloud_run.job.task_index")
+      - delete_key(attributes, "gcp.gce.instance_group_manager.name")
+      - delete_key(attributes, "gcp.gce.instance_group_manager.region")
+      - delete_key(attributes, "gcp.gce.instance_group_manager.zone")
+      - delete_key(attributes, "host.image.id")
+      - delete_key(attributes, "host.type")
+      - delete_key(attributes, "os.type")
+      - delete_key(attributes, "os.version")
+      - delete_key(attributes, "process.command")
+      - delete_key(attributes, "process.command_line")
+      - delete_key(attributes, "process.command_args")
+      - delete_key(attributes, "process.executable.name")
+      - delete_key(attributes, "process.executable.path")
+      - delete_key(attributes, "process.owner")
+      - delete_key(attributes, "process.pid")
+      - delete_key(attributes, "process.parent_pid")
+      - delete_key(attributes, "process.runtime.description")
+      - delete_key(attributes, "process.runtime.name")
+      - delete_key(attributes, "process.runtime.version")
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        max_recv_msg_size_mib: 20
+      http:
+        endpoint: 0.0.0.0:4318
+  prometheus:
+    config:
+      scrape_configs:
+      - job_name: opentelemetry-collector
+        scrape_interval: '30s'
+        static_configs:
+        - targets:
+          - localhost:8888
+
+exporters:
+  coralogix:
+    application_name: otel-demo
+    application_name_attributes:
+    - service.namespace
+    domain: app.staging.coralogix.net
+    logs:
+      headers:
+        X-Coralogix-Distribution: host-otel-integration/1.0.0
+    metrics:
+      headers:
+        X-Coralogix-Distribution: host-otel-integration/1.0.0
+    private_key: ${env:CORALOGIX_PRIVATE_KEY}
+    profiles:
+      headers:
+        X-Coralogix-Distribution: host-otel-integration/1.0.0
+    subsystem_name: integration
+    subsystem_name_attributes:
+    - service.name
+    timeout: 30s
+    traces:
+      headers:
+        X-Coralogix-Distribution: host-otel-integration/1.0.0
+  coralogix/resource_catalog:
+    application_name: resource
+    domain: app.staging.coralogix.net
+    logs:
+      headers:
+        X-Coralogix-Distribution: host-otel-integration/1.0.0
+        x-coralogix-ingress: metadata-as-otlp-logs/v1
+    private_key: ${env:CORALOGIX_PRIVATE_KEY}
+    subsystem_name: catalog
+    timeout: 30s
+  debug: {}
+
+service:
+  extensions:
+  - health_check
+  - opamp
+  - zpages
+  - pprof
+  pipelines:
+    logs:
+      exporters:
+      - coralogix
+      processors:
+      - memory_limiter
+      - resource/metadata
+      - resourcedetection/region
+      - resourcedetection/env
+      - transform/reduce
+      - batch
+      receivers:
+      - otlp
+    logs/resource_catalog:
+      exporters:
+      - coralogix/resource_catalog
+      processors:
+      - memory_limiter
+      - resource/metadata
+      - batch
+      receivers:
+      - otlp
+    metrics:
+      exporters:
+      - coralogix
+      processors:
+      - memory_limiter
+      - resource/metadata
+      - resourcedetection/region
+      - resourcedetection/env
+      - transform/reduce
+      - batch
+      receivers:
+      - prometheus
+      - otlp
+    traces:
+      exporters:
+      - debug
+      - coralogix
+      processors:
+      - memory_limiter
+      - resource/metadata
+      - resourcedetection/region
+      - resourcedetection/env
+      - transform/reduce
+      - batch
+      receivers:
+      - otlp
+  telemetry:
+    logs:
+      encoding: json
+      level: 'info'
+    metrics:
+      readers:
+      - pull:
+          exporter:
+            prometheus:
+              host: localhost
+              port: 8888
+    resource:
+      cx.agent.type: cluster-collector
+      service.name: opentelemetry-collector

@@ -1,0 +1,38 @@
+[Unit]
+Description=OpenTelemetry Demo - Checkout Service
+After=network.target coralogix-collector.service cart.service currency.service email.service payment.service product-catalog.service shipping.service kafka.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=oteldemo
+Group=oteldemo
+WorkingDirectory=/opt/oteldemo/checkout
+ExecStart=/usr/local/bin/checkout
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=oteldemo-checkout
+
+# Environment
+Environment=CHECKOUT_PORT=8082
+Environment=CART_ADDR=http://localhost:8081
+Environment=CURRENCY_ADDR=http://localhost:8083
+Environment=EMAIL_ADDR=http://localhost:8087
+Environment=PAYMENT_ADDR=http://localhost:8088
+Environment=PRODUCT_CATALOG_ADDR=http://localhost:8084
+Environment=SHIPPING_ADDR=http://localhost:8086
+Environment=KAFKA_ADDR=localhost:9092
+Environment=GOMEMLIMIT=16MiB
+Environment=OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+Environment=OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta
+Environment=OTEL_SERVICE_NAME=checkout
+Environment=OTEL_RESOURCE_ATTRIBUTES=service.name=checkout,service.version=1.0.0,deployment.environment=host
+
+# Resource limits
+MemoryMax=128M
+CPUQuota=25%
+
+[Install]
+WantedBy=multi-user.target
