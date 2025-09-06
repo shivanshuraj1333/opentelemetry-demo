@@ -26,6 +26,11 @@ scp -r . user@your-vm:/opt/otel-demo/
 # SSH and install
 ssh user@your-vm
 cd /opt/otel-demo
+
+# If you get package dependency errors, run this first:
+sudo ./fix-dependencies.sh
+
+# Then install
 sudo ./install.sh
 ```
 

@@ -42,12 +42,35 @@ declare -A SERVICES=(
 
 # Install dependencies
 log_info "Installing dependencies..."
+
+# Fix any broken packages first
 apt-get update
+apt-get install -f -y
+
+# Remove conflicting packages
+apt-get remove -y containerd npm || true
+
+# Install basic dependencies
 apt-get install -y \
-    docker.io \
-    docker-compose-plugin \
-    nodejs \
-    npm \
+    curl \
+    wget \
+    gnupg \
+    lsb-release \
+    ca-certificates \
+    software-properties-common
+
+# Install Docker
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+apt-get update
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Install Node.js 20+ (this will handle npm)
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt-get install -y nodejs
+
+# Install other dependencies
+apt-get install -y \
     python3 \
     python3-pip \
     dotnet-sdk-8.0 \
@@ -60,13 +83,7 @@ apt-get install -y \
     rustc \
     cargo \
     nginx \
-    netcat-openbsd \
-    curl \
-    wget
-
-# Install Node.js 20+
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt-get install -y nodejs
+    netcat-openbsd
 
 # Start Docker
 systemctl start docker
