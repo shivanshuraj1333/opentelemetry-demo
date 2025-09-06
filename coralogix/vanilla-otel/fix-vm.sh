@@ -36,6 +36,44 @@ check_root() {
     fi
 }
 
+cleanup_previous() {
+    log_info "Cleaning up previous installation..."
+    
+    # Stop all services
+    systemctl stop oteldemo-frontend oteldemo-cart oteldemo-checkout oteldemo-currency oteldemo-payment oteldemo-product-catalog oteldemo-load-generator 2>/dev/null || true
+    systemctl stop otel-collector jaeger kafka zookeeper 2>/dev/null || true
+    
+    # Disable services
+    systemctl disable oteldemo-frontend oteldemo-cart oteldemo-checkout oteldemo-currency oteldemo-payment oteldemo-product-catalog oteldemo-load-generator 2>/dev/null || true
+    systemctl disable otel-collector jaeger kafka zookeeper 2>/dev/null || true
+    
+    # Remove service files
+    rm -f /etc/systemd/system/oteldemo-*.service
+    rm -f /etc/systemd/system/otel-collector.service
+    rm -f /etc/systemd/system/jaeger.service
+    rm -f /etc/systemd/system/kafka.service
+    rm -f /etc/systemd/system/zookeeper.service
+    
+    # Remove directories
+    rm -rf /opt/oteldemo
+    rm -rf /opt/kafka
+    rm -rf /etc/otelcol
+    rm -rf /var/lib/jaeger
+    rm -rf /var/lib/kafka-logs
+    
+    # Remove users
+    userdel oteldemo 2>/dev/null || true
+    userdel jaeger 2>/dev/null || true
+    userdel kafka 2>/dev/null || true
+    userdel zookeeper 2>/dev/null || true
+    userdel otelcol 2>/dev/null || true
+    
+    # Reload systemd
+    systemctl daemon-reload
+    
+    log_success "Cleanup completed"
+}
+
 fix_nodejs() {
     log_info "Fixing Node.js version..."
     
@@ -152,6 +190,7 @@ main() {
     log_info "Starting VM fix process..."
     
     check_root
+    cleanup_previous
     
     fix_nodejs
     fix_redis

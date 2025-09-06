@@ -34,6 +34,9 @@ cd /opt/otel-demo
 # Make scripts executable
 sudo chmod +x *.sh
 
+# Clean up any previous installation (if needed)
+sudo ./cleanup.sh
+
 # Run comprehensive test (recommended)
 sudo ./test-vm.sh
 ```

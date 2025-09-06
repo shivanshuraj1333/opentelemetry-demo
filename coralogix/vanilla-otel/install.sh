@@ -46,6 +46,83 @@ check_root() {
     fi
 }
 
+cleanup_previous_installation() {
+    log_info "Cleaning up previous installation..."
+    
+    # Stop all services
+    log_info "Stopping all services..."
+    systemctl stop oteldemo-frontend oteldemo-cart oteldemo-checkout oteldemo-currency oteldemo-payment oteldemo-product-catalog oteldemo-load-generator 2>/dev/null || true
+    systemctl stop otel-collector jaeger kafka zookeeper 2>/dev/null || true
+    systemctl stop redis-server postgresql 2>/dev/null || true
+    
+    # Disable services
+    log_info "Disabling services..."
+    systemctl disable oteldemo-frontend oteldemo-cart oteldemo-checkout oteldemo-currency oteldemo-payment oteldemo-product-catalog oteldemo-load-generator 2>/dev/null || true
+    systemctl disable otel-collector jaeger kafka zookeeper 2>/dev/null || true
+    
+    # Remove systemd service files
+    log_info "Removing systemd service files..."
+    rm -f /etc/systemd/system/oteldemo-*.service
+    rm -f /etc/systemd/system/otel-collector.service
+    rm -f /etc/systemd/system/jaeger.service
+    rm -f /etc/systemd/system/kafka.service
+    rm -f /etc/systemd/system/zookeeper.service
+    
+    # Remove installed binaries
+    log_info "Removing installed binaries..."
+    rm -f /usr/local/bin/otelcol-contrib
+    rm -f /usr/local/bin/jaeger-all-in-one
+    rm -f /usr/local/bin/kafka-server-start
+    rm -f /usr/local/bin/kafka-topics
+    rm -f /usr/local/bin/zookeeper-server-start
+    
+    # Remove directories
+    log_info "Removing directories..."
+    rm -rf /opt/oteldemo
+    rm -rf /opt/kafka
+    rm -rf /etc/otelcol
+    rm -rf /var/lib/jaeger
+    rm -rf /var/lib/kafka-logs
+    
+    # Remove users (but keep system users like postgres, redis)
+    log_info "Removing service users..."
+    userdel oteldemo 2>/dev/null || true
+    userdel jaeger 2>/dev/null || true
+    userdel kafka 2>/dev/null || true
+    userdel zookeeper 2>/dev/null || true
+    userdel otelcol 2>/dev/null || true
+    
+    # Remove groups
+    groupdel oteldemo 2>/dev/null || true
+    groupdel jaeger 2>/dev/null || true
+    groupdel kafka 2>/dev/null || true
+    groupdel zookeeper 2>/dev/null || true
+    groupdel otelcol 2>/dev/null || true
+    
+    # Clean up package cache
+    log_info "Cleaning package cache..."
+    apt-get clean
+    apt-get autoremove -y
+    
+    # Reload systemd
+    systemctl daemon-reload
+    
+    # Reset Redis configuration
+    log_info "Resetting Redis configuration..."
+    if [ -f "/etc/redis/redis.conf" ]; then
+        sed -i 's/^bind 127.0.0.1/# bind 127.0.0.1/' /etc/redis/redis.conf
+        sed -i 's/^requirepass otel/# requirepass foobared/' /etc/redis/redis.conf
+    fi
+    
+    # Reset PostgreSQL configuration
+    log_info "Resetting PostgreSQL configuration..."
+    if [ -f "/etc/postgresql/*/main/pg_hba.conf" ]; then
+        sed -i '/host all all 0.0.0.0\/0 md5/d' /etc/postgresql/*/main/pg_hba.conf 2>/dev/null || true
+    fi
+    
+    log_success "Cleanup completed"
+}
+
 detect_os() {
     if [[ -f /etc/os-release ]]; then
         . /etc/os-release
@@ -406,6 +483,7 @@ main() {
     log_info "Starting OpenTelemetry Demo Vanilla Host Installation"
     
     check_root
+    cleanup_previous_installation
     detect_os
     install_dependencies
     download_otelcol
