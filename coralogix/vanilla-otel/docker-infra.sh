@@ -48,8 +48,11 @@ check_docker() {
 get_compose_cmd() {
     if command -v docker-compose &> /dev/null; then
         echo "docker-compose"
-    else
+    elif docker compose version &> /dev/null; then
         echo "docker compose"
+    else
+        log_error "Neither docker-compose nor docker compose is available"
+        exit 1
     fi
 }
 

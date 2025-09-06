@@ -30,9 +30,16 @@ log_error() {
 main() {
     log_info "Fixing Docker infrastructure issues..."
     
+    # Detect compose command
+    if command -v docker-compose &> /dev/null; then
+        COMPOSE_CMD="docker-compose"
+    else
+        COMPOSE_CMD="docker compose"
+    fi
+    
     # Stop any running containers
     log_info "Stopping existing containers..."
-    docker-compose -f docker-compose-infrastructure.yml down 2>/dev/null || true
+    $COMPOSE_CMD -f docker-compose-infrastructure.yml down 2>/dev/null || true
     
     # Remove any problematic containers
     log_info "Cleaning up containers..."
@@ -40,14 +47,14 @@ main() {
     
     # Start fresh
     log_info "Starting infrastructure services..."
-    docker-compose -f docker-compose-infrastructure.yml up -d
+    $COMPOSE_CMD -f docker-compose-infrastructure.yml up -d
     
     # Wait a bit
     sleep 10
     
     # Check status
     log_info "Checking service status..."
-    docker-compose -f docker-compose-infrastructure.yml ps
+    $COMPOSE_CMD -f docker-compose-infrastructure.yml ps
     
     log_success "Fix completed!"
     log_info "Check status with: ./docker-infra.sh status"
