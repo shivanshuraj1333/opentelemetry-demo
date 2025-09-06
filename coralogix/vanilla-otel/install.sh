@@ -157,11 +157,11 @@ install_dependencies() {
             apt-get update
             
             log_info "Installing system packages..."
-            apt-get install -y wget curl unzip systemd postgresql postgresql-contrib redis-server \
-                openjdk-11-jdk python3 python3-pip python3-venv \
+            apt-get install -y wget curl unzip systemd \
+                python3 python3-pip python3-venv \
                 dotnet-sdk-8.0 golang-go php-cli php-curl php-json \
                 build-essential cmake pkg-config libssl-dev \
-                default-jre || log_error "Some packages failed to install"
+                docker.io docker-compose-plugin netcat-openbsd || log_error "Some packages failed to install"
             
             log_info "Installing Node.js 20+ from NodeSource..."
             curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
@@ -188,115 +188,29 @@ install_dependencies() {
     esac
 }
 
-download_otelcol() {
-    log_info "Downloading OpenTelemetry Collector..."
+setup_docker() {
+    log_info "Setting up Docker infrastructure..."
     
-    # Detect architecture
-    ARCH=$(uname -m)
-    case $ARCH in
-        x86_64)
-            ARCH="amd64"
-            ;;
-        aarch64|arm64)
-            ARCH="arm64"
-            ;;
-        *)
-            log_error "Unsupported architecture: $ARCH"
-            exit 1
-            ;;
-    esac
+    # Start Docker service
+    systemctl start docker
+    systemctl enable docker
     
-    # Download otelcol-contrib
-    DOWNLOAD_URL="https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v${OTELCOL_VERSION}/otelcol-contrib_${OTELCOL_VERSION}_linux_${ARCH}.tar.gz"
+    # Add current user to docker group (if not root)
+    if [ "$(id -u)" -ne 0 ]; then
+        usermod -aG docker "$(logname)" 2>/dev/null || true
+    fi
     
-    log_info "Downloading from: $DOWNLOAD_URL"
-    wget -O /tmp/otelcol-contrib.tar.gz "$DOWNLOAD_URL"
-    
-    # Extract and install
-    tar -xzf /tmp/otelcol-contrib.tar.gz -C /tmp/
-    cp /tmp/otelcol-contrib /usr/local/bin/
-    chmod +x /usr/local/bin/otelcol-contrib
-    
-    # Cleanup
-    rm -f /tmp/otelcol-contrib.tar.gz /tmp/otelcol-contrib
+    # Start infrastructure services
+    if [ -f "./docker-infra.sh" ]; then
+        chmod +x ./docker-infra.sh
+        ./docker-infra.sh start
+        log_success "Docker infrastructure started"
+    else
+        log_error "docker-infra.sh not found"
+        exit 1
+    fi
 }
 
-download_jaeger() {
-    log_info "Downloading Jaeger..."
-    
-    # Detect architecture
-    ARCH=$(uname -m)
-    case $ARCH in
-        x86_64)
-            ARCH="linux-amd64"
-            ;;
-        aarch64|arm64)
-            ARCH="linux-arm64"
-            ;;
-        *)
-            log_error "Unsupported architecture: $ARCH"
-            exit 1
-            ;;
-    esac
-    
-    # Download Jaeger
-    JAEGER_VERSION="1.51.0"
-    DOWNLOAD_URL="https://github.com/jaegertracing/jaeger/releases/download/v${JAEGER_VERSION}/jaeger-${JAEGER_VERSION}-${ARCH}.tar.gz"
-    
-    log_info "Downloading from: $DOWNLOAD_URL"
-    wget -O /tmp/jaeger.tar.gz "$DOWNLOAD_URL"
-    
-    # Extract and install
-    tar -xzf /tmp/jaeger.tar.gz -C /tmp/
-    cp /tmp/jaeger-${JAEGER_VERSION}-${ARCH}/jaeger-all-in-one /usr/local/bin/
-    chmod +x /usr/local/bin/jaeger-all-in-one
-    
-    # Cleanup
-    rm -rf /tmp/jaeger.tar.gz /tmp/jaeger-${JAEGER_VERSION}-${ARCH}
-}
-
-download_kafka() {
-    log_info "Downloading Apache Kafka..."
-    
-    # Detect architecture
-    ARCH=$(uname -m)
-    case $ARCH in
-        x86_64)
-            ARCH=""
-            ;;
-        aarch64|arm64)
-            ARCH="-aarch64"
-            ;;
-        *)
-            log_error "Unsupported architecture: $ARCH"
-            exit 1
-            ;;
-    esac
-    
-    # Download Kafka
-    KAFKA_VERSION="2.13-3.6.1"
-    DOWNLOAD_URL="https://downloads.apache.org/kafka/3.6.1/kafka_${KAFKA_VERSION}.tgz"
-    
-    log_info "Downloading from: $DOWNLOAD_URL"
-    wget -O /tmp/kafka.tgz "$DOWNLOAD_URL"
-    
-    # Extract and install
-    tar -xzf /tmp/kafka.tgz -C /opt/
-    mv /opt/kafka_${KAFKA_VERSION} /opt/kafka
-    
-    # Create symlinks
-    ln -sf /opt/kafka/bin/kafka-server-start.sh /usr/local/bin/kafka-server-start
-    ln -sf /opt/kafka/bin/kafka-topics.sh /usr/local/bin/kafka-topics
-    ln -sf /opt/kafka/bin/zookeeper-server-start.sh /usr/local/bin/zookeeper-server-start
-    
-    # Set ownership
-    chown -R kafka:kafka /opt/kafka 2>/dev/null || true
-    
-    # Cleanup
-    rm -f /tmp/kafka.tgz
-    
-    log_success "Kafka installed to /opt/kafka"
-}
 
 create_users() {
     log_info "Creating service users and groups..."
@@ -317,46 +231,17 @@ create_users() {
         log_info "User $SERVICE_USER already exists"
     fi
     
-    # Create jaeger user
-    if ! id "jaeger" &>/dev/null; then
-        useradd --system --no-create-home --shell /bin/false "jaeger"
-        log_success "Created user: jaeger"
-    else
-        log_info "User jaeger already exists"
-    fi
-    
-    # Create kafka user
-    if ! id "kafka" &>/dev/null; then
-        useradd --system --no-create-home --shell /bin/false "kafka"
-        log_success "Created user: kafka"
-    else
-        log_info "User kafka already exists"
-    fi
-    
-    # Create zookeeper user
-    if ! id "zookeeper" &>/dev/null; then
-        useradd --system --no-create-home --shell /bin/false "zookeeper"
-        log_success "Created user: zookeeper"
-    else
-        log_info "User zookeeper already exists"
-    fi
+    # Note: Infrastructure services (PostgreSQL, Redis, Kafka, Zookeeper, Jaeger, OpenTelemetry Collector)
+    # are now running in Docker containers, so we don't need to create users for them
 }
 
 create_directories() {
     log_info "Creating directories..."
     
-    # Create otelcol directories
-    mkdir -p "$CONFIG_DIR"
-    mkdir -p "$DATA_DIR"
-    mkdir -p "/var/lib/jaeger"
-    mkdir -p "/var/lib/kafka-logs"
+    # Create directories for demo services only
     mkdir -p "/opt/oteldemo"
     
     # Set ownership
-    chown -R "$OTEL_USER:$OTEL_GROUP" "$CONFIG_DIR"
-    chown -R "$OTEL_USER:$OTEL_GROUP" "$DATA_DIR"
-    chown -R "jaeger:jaeger" "/var/lib/jaeger"
-    chown -R "kafka:kafka" "/var/lib/kafka-logs"
     chown -R "$SERVICE_USER:$SERVICE_GROUP" "/opt/oteldemo"
     
     log_success "Created directories"
@@ -376,31 +261,42 @@ install_configs() {
 }
 
 install_systemd_services() {
-    log_info "Installing systemd services..."
+    log_info "Installing systemd services for demo services..."
     
-    # Copy service files
-    cp services/*.service /etc/systemd/system/
+    # Copy only demo service files (infrastructure runs in Docker)
+    cp services/oteldemo-*.service /etc/systemd/system/
     
     # Reload systemd
     systemctl daemon-reload
     
-    log_success "Systemd services installed"
+    log_success "Demo systemd services installed"
 }
 
 setup_database() {
-    log_info "Setting up PostgreSQL database..."
+    log_info "Setting up PostgreSQL database (running in Docker)..."
     
-    # Initialize PostgreSQL if needed
-    if [[ ! -d "/var/lib/postgresql/data" ]]; then
-        sudo -u postgres initdb -D /var/lib/postgresql/data
-    fi
+    # Wait for PostgreSQL container to be ready
+    log_info "Waiting for PostgreSQL to be ready..."
+    local max_attempts=30
+    local attempt=1
     
-    # Create database and user
-    sudo -u postgres psql -c "CREATE DATABASE otel;" || true
-    sudo -u postgres psql -c "CREATE USER root WITH PASSWORD 'otel';" || true
-    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE otel TO root;" || true
+    while [ $attempt -le $max_attempts ]; do
+        if nc -z localhost 5432 2>/dev/null; then
+            log_success "PostgreSQL is ready"
+            break
+        fi
+        
+        if [ $attempt -eq $max_attempts ]; then
+            log_warning "PostgreSQL is not ready after $max_attempts attempts"
+            return 1
+        fi
+        
+        sleep 2
+        ((attempt++))
+    done
     
-    log_success "Database setup completed"
+    # Database and user are already created by Docker init script
+    log_success "Database setup completed (handled by Docker)"
 }
 
 setup_demo_services() {
@@ -435,64 +331,31 @@ configure_services() {
 }
 
 start_services() {
-    log_info "Starting services..."
+    log_info "Starting demo services..."
     
-    # Start infrastructure services with error handling
-    log_info "Starting infrastructure services..."
-    systemctl start postgresql || log_warning "PostgreSQL failed to start"
-    sleep 2
-    systemctl start redis-server || log_warning "Redis failed to start"
-    sleep 2
-    systemctl start otel-collector || log_warning "OpenTelemetry Collector failed to start"
-    sleep 2
-    systemctl start jaeger || log_warning "Jaeger failed to start"
-    sleep 2
-    systemctl start kafka || log_warning "Kafka failed to start"
-    sleep 2
-    systemctl start zookeeper || log_warning "Zookeeper failed to start"
-    sleep 2
+    # Infrastructure services are already running in Docker
+    log_info "Infrastructure services are running in Docker containers"
     
     # Start demo services with error handling
-    log_info "Starting demo services..."
     for service in oteldemo-frontend oteldemo-cart oteldemo-checkout oteldemo-currency oteldemo-payment oteldemo-product-catalog oteldemo-load-generator; do
         systemctl start "$service" || log_warning "$service failed to start"
         sleep 1
     done
     
-    log_success "Service startup completed"
+    log_success "Demo services started"
     log_info "Check service status with: sudo ./quick-start.sh status"
+    log_info "Check Docker infrastructure with: ./docker-infra.sh status"
 }
 
 check_installation() {
     log_info "Checking installation status..."
     
-    # Check if key services are running
-    local failed_services=()
-    
-    if ! systemctl is-active --quiet postgresql; then
-        failed_services+=("postgresql")
-    fi
-    
-    if ! systemctl is-active --quiet redis-server; then
-        failed_services+=("redis-server")
-    fi
-    
-    if ! systemctl is-active --quiet otel-collector; then
-        failed_services+=("otel-collector")
-    fi
-    
-    if ! systemctl is-active --quiet jaeger; then
-        failed_services+=("jaeger")
-    fi
-    
-    if [ ${#failed_services[@]} -gt 0 ]; then
-        log_warning "Some infrastructure services failed to start: ${failed_services[*]}"
-        log_info "You can try to start them manually:"
-        for service in "${failed_services[@]}"; do
-            log_info "  sudo systemctl start $service"
-        done
+    # Check Docker infrastructure services
+    log_info "Checking Docker infrastructure services..."
+    if [ -f "./docker-infra.sh" ]; then
+        ./docker-infra.sh status
     else
-        log_success "All infrastructure services are running"
+        log_warning "docker-infra.sh not found, cannot check Docker services"
     fi
     
     # Check demo services
@@ -505,24 +368,27 @@ check_installation() {
     
     if [ ${#demo_failed[@]} -gt 0 ]; then
         log_warning "Some demo services failed to start: ${demo_failed[*]}"
+        log_info "You can try to start them manually:"
+        for service in "${demo_failed[@]}"; do
+            log_info "  sudo systemctl start $service"
+        done
     else
         log_success "All demo services are running"
     fi
 }
 
 enable_services() {
-    log_info "Enabling services..."
+    log_info "Enabling demo services..."
     
-    # Enable infrastructure services
-    systemctl enable postgresql redis-server
-    systemctl enable otel-collector jaeger
+    # Infrastructure services are managed by Docker, no need to enable them
+    log_info "Infrastructure services are managed by Docker"
     
-    # Enable demo services (optional, can be started manually)
+    # Enable demo services
     systemctl enable oteldemo-frontend oteldemo-cart oteldemo-checkout \
         oteldemo-currency oteldemo-payment oteldemo-product-catalog \
         oteldemo-load-generator
     
-    log_success "Services enabled"
+    log_success "Demo services enabled"
 }
 
 show_next_steps() {
@@ -556,9 +422,7 @@ main() {
     cleanup_previous_installation
     detect_os
     install_dependencies
-    download_otelcol
-    download_jaeger
-    download_kafka
+    setup_docker
     create_users
     create_directories
     install_configs

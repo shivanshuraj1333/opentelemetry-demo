@@ -37,34 +37,15 @@ check_root() {
 }
 
 start_infrastructure() {
-    log_info "Starting infrastructure services..."
+    log_info "Starting infrastructure services (Docker)..."
     
-    # Start PostgreSQL
-    systemctl start postgresql
-    log_success "PostgreSQL started"
-    
-    # Start Redis
-    systemctl start redis-server
-    log_success "Redis started"
-    
-    # Start Zookeeper
-    systemctl start zookeeper
-    log_success "Zookeeper started"
-    
-    # Wait a bit for Zookeeper to be ready
-    sleep 5
-    
-    # Start Kafka
-    systemctl start kafka
-    log_success "Kafka started"
-    
-    # Start OpenTelemetry Collector
-    systemctl start otel-collector
-    log_success "OpenTelemetry Collector started"
-    
-    # Start Jaeger
-    systemctl start jaeger
-    log_success "Jaeger started"
+    if [ -f "./docker-infra.sh" ]; then
+        ./docker-infra.sh start
+        log_success "Docker infrastructure started"
+    else
+        log_error "docker-infra.sh not found"
+        exit 1
+    fi
 }
 
 start_demo_services() {
