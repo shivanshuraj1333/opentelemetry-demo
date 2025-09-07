@@ -40,14 +40,12 @@ receivers:
 exporters:
   debug:
     verbosity: detailed
-  jaeger:
+  otlp:
     endpoint: jaeger:14250
     tls:
       insecure: true
   prometheus:
     endpoint: "0.0.0.0:8889"
-  logging:
-    loglevel: debug
 
 processors:
   batch:
@@ -57,18 +55,18 @@ processors:
     spike_limit_percentage: 25
   resourcedetection:
     detectors: [env, system]
-  span:
-    rename_attributes:
+  attributes:
+    actions:
       - key: "service.name"
-        from_attributes: ["service.name"]
         action: upsert
+        from_attribute: "service.name"
 
 service:
   pipelines:
     traces:
       receivers: [otlp, jaeger, zipkin]
-      processors: [resourcedetection, memory_limiter, span, batch]
-      exporters: [jaeger, debug]
+      processors: [resourcedetection, memory_limiter, attributes, batch]
+      exporters: [otlp, debug]
     metrics:
       receivers: [hostmetrics, prometheus, otlp]
       processors: [resourcedetection, memory_limiter, batch]
