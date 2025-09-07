@@ -115,22 +115,6 @@ services:
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
 
-  opensearch:
-    image: opensearchproject/opensearch:2.11.0
-    environment:
-      - discovery.type=single-node
-      - "DISABLE_INSTALL_DEMO_CONFIG=true"
-      - "DISABLE_SECURITY_PLUGIN=true"
-    ports:
-      - "9200:9200"
-    volumes:
-      - opensearch_data:/usr/share/opensearch/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   grafana:
     image: grafana/grafana:latest
     ports:
@@ -141,32 +125,10 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
 
-  flagd:
-    image: ghcr.io/open-feature/flagd:latest
-    ports:
-      - "8013:8013"
-      - "8014:8014"
-    volumes:
-      - ./flagd:/etc/flagd:ro
-    command: ["start", "--uri", "file:./etc/flagd/demo.flagd.json"]
-    environment:
-      - FLAGD_OTEL_COLLECTOR_URI=otel-collector:4317
-      - FLAGD_METRICS_EXPORTER=otel
-
-  flagd-ui:
-    image: nginx:alpine
-    ports:
-      - "8080:80"
-    volumes:
-      - ./flagd-ui.html:/usr/share/nginx/html/index.html:ro
-    depends_on:
-      - flagd
-
 volumes:
   postgres_data:
   kafka_data:
   zookeeper_data:
   jaeger_data:
   prometheus_data:
-  opensearch_data:
   grafana_data:
