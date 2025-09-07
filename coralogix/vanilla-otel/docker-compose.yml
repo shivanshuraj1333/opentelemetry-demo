@@ -142,7 +142,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
 
   flagd:
-    image: ghcr.io/open-feature/flagd:latest
+    image: openfeature/flagd:latest
     ports:
       - "8013:8013"
       - "8014:8014"
@@ -154,12 +154,13 @@ services:
       - FLAGD_METRICS_EXPORTER=otel
 
   flagd-ui:
-    image: ghcr.io/open-feature/flagd-ui:latest
+    image: nginx:alpine
     ports:
-      - "8080:8080"
-    environment:
-      - FLAGD_HOST=flagd
-      - FLAGD_PORT=8013
+      - "8080:80"
+    volumes:
+      - ./flagd-ui.html:/usr/share/nginx/html/index.html:ro
+    depends_on:
+      - flagd
 
 volumes:
   postgres_data:

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flagd UI - OpenTelemetry Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .status {
+            background: #e8f5e8;
+            border: 1px solid #4caf50;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .info {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .endpoint {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+        .button {
+            background: #2196f3;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px 5px;
+        }
+        .button:hover {
+            background: #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚩 Flagd UI - OpenTelemetry Demo</h1>
+        
+        <div class="status">
+            <h3>✅ Status: Running</h3>
+            <p>Flagd service is running and ready to serve feature flags.</p>
+        </div>
+        
+        <div class="info">
+            <h3>📋 Available Feature Flags</h3>
+            <ul>
+                <li><strong>productCatalogFailure</strong> - Simulates product catalog failures</li>
+                <li><strong>recommendationCache</strong> - Enables recommendation caching</li>
+                <li><strong>adFailure</strong> - Simulates ad service failures</li>
+            </ul>
+        </div>
+        
+        <div class="info">
+            <h3>🔗 API Endpoints</h3>
+            <div class="endpoint">
+                <strong>Flagd gRPC:</strong> localhost:8013
+            </div>
+            <div class="endpoint">
+                <strong>Flagd HTTP:</strong> localhost:8014
+            </div>
+        </div>
+        
+        <div class="info">
+            <h3>🧪 Test Feature Flags</h3>
+            <p>You can test the feature flags using curl:</p>
+            <div class="endpoint">
+                curl -X POST http://localhost:8014/schema.v1.SchemaService/ResolveString \
+                -H "Content-Type: application/json" \
+                -d '{"flagKey": "productCatalogFailure", "context": {"userId": "1"}}'
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="http://localhost:16686" class="button">Jaeger UI</a>
+            <a href="http://localhost:3001" class="button">Grafana</a>
+            <a href="http://localhost:9090" class="button">Prometheus</a>
+            <a href="http://localhost:3000" class="button">Frontend</a>
+        </div>
+    </div>
+</body>
+</html>
